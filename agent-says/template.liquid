@@ -1,0 +1,41 @@
+<div style="font-family: sans-serif; padding: 24px 28px; background: #fff; color: #000; height: 480px; width: 800px; position: relative; overflow: hidden;">
+
+  <!-- Decorative dots -->
+  <div style="position: absolute; top: 8px; right: 16px; font-size: 28px; opacity: 0.1; letter-spacing: 8px;">· · · · ·</div>
+  <div style="position: absolute; bottom: 12px; right: 20px; font-size: 20px; opacity: 0.08; letter-spacing: 6px;">· · ·</div>
+
+  <!-- Two-column layout -->
+  <div style="display: flex; gap: 28px; height: 100%;">
+
+    <!-- Left: Agent message -->
+    <div style="flex: 1; display: flex; flex-direction: column;">
+      <div style="font-size: 22px; font-weight: 800; margin-bottom: 16px; border-bottom: 3px solid #000; padding-bottom: 10px;">
+        🤖 {{ agent_name | default: "Agent" }} Says
+      </div>
+      <div style="font-size: 15px; line-height: 1.5; flex: 1; padding-right: 8px;">
+        "{{ message }}"
+      </div>
+      <div style="font-size: 11px; color: #888; margin-top: 12px;">
+        {{ signature | default: agent_name }} · {{ date }}
+      </div>
+    </div>
+
+    <!-- Right: Priorities -->
+    <div style="width: 280px; border-left: 2px solid #000; padding-left: 24px; display: flex; flex-direction: column;">
+      <div style="font-size: 16px; font-weight: 800; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 1px;">
+        Today's Focus
+      </div>
+
+      {% for i in (1..5) %}
+        {% assign p_key = 'priority_' | append: i %}
+        {% if [p_key] and [p_key] != "" %}
+        <div style="display: flex; align-items: flex-start; margin-bottom: 14px;">
+          <div style="font-size: 24px; font-weight: 800; min-width: 32px; color: #bbb;">{{ i }}</div>
+          <div style="font-size: 13px; line-height: 1.4; padding-top: 4px;">{{ [p_key] }}</div>
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+  </div>
+</div>
