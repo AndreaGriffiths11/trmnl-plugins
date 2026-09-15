@@ -1,7 +1,8 @@
 name: Agent Says — Daily Push
 
 on:
-  workflow_dispatch:
+  repository_dispatch:
+    types: [rusty_agent_says]
 
 jobs:
   push-agent-says:
@@ -21,8 +22,8 @@ jobs:
           echo "$ISSUES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Generate message with GitHub Models
-        id: copilot
+      - name: Generate Rusty's message with GitHub Models
+        id: rusty
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUES: ${{ steps.context.outputs.ISSUES }}
@@ -30,16 +31,14 @@ jobs:
           PAYLOAD=$(jq -n \
             --arg issues "$ISSUES" \
             '{
-              "messages": [{"role": "user", "content": ("You are a concise, motivational AI assistant. Based on these open issues, write:\n1. A short daily message (1-2 sentences, motivational but practical)\n2. Up to 3 priorities for today\n\nOpen Issues: " + $issues + "\n\nRespond in JSON only: {\"message\": \"...\", \"priorities\": [\"...\", \"...\", \"...\"]}")}],
+              "messages": [{"role": "user", "content": ("You are Rusty, a concise engineering assistant. Based only on these public open issues, write:\n1. A short daily message (1-2 sentences, practical and direct)\n2. Up to 3 priorities for today\n\nOpen Issues: " + $issues + "\n\nDo not invent work when there are no issues. Respond in JSON only: {\"message\": \"...\", \"priorities\": [\"...\", \"...\", \"...\"]}")}],
               "model": "gpt-4o"
             }')
 
-          RESPONSE=$(curl -s https://models.inference.ai.azure.com/chat/completions \
+          RESPONSE=$(curl --fail-with-body --silent --show-error https://models.inference.ai.azure.com/chat/completions \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Content-Type: application/json" \
             -d "$PAYLOAD")
-
-          echo "DEBUG: $RESPONSE"
 
           CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content' | sed 's/```json//g; s/```//g' | jq -c '.')
           echo "CONTENT<<EOF" >> $GITHUB_OUTPUT
@@ -48,9 +47,9 @@ jobs:
 
       - name: Push to TRMNL
         env:
+          CONTENT: ${{ steps.rusty.outputs.CONTENT }}
           TRMNL_WEBHOOK_URL: ${{ secrets.TRMNL_WEBHOOK_URL }}
         run: |
-          CONTENT='${{ steps.copilot.outputs.CONTENT }}'
           MESSAGE=$(echo "$CONTENT" | jq -r '.message')
           P1=$(echo "$CONTENT" | jq -r '.priorities[0] // empty')
           P2=$(echo "$CONTENT" | jq -r '.priorities[1] // empty')
@@ -64,16 +63,16 @@ jobs:
             --arg p2 "$P2" \
             --arg p3 "$P3" \
             '{merge_variables: {
-              agent_name: "Copilot",
+              agent_name: "Rusty",
               message: $msg,
-              signature: "— Copilot 🤖",
+              signature: "— Rusty 🦀",
               date: $date,
               priority_1: $p1,
               priority_2: $p2,
               priority_3: $p3
             }}')
 
-          curl -s -X POST "$TRMNL_WEBHOOK_URL" \
+          curl --fail --silent --show-error --output /dev/null -X POST "$TRMNL_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "$PAYLOAD"
-          echo "Done!"
+          echo "TRMNL accepted the update."
