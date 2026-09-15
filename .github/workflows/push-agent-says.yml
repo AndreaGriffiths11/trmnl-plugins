@@ -10,7 +10,6 @@ jobs:
     permissions:
       issues: read
       contents: read
-      models: read
     steps:
       - name: Fetch open issues
         id: context
@@ -22,28 +21,21 @@ jobs:
           echo "$ISSUES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Generate Rusty's message with GitHub Models
+      - name: Compose Rusty's message
         id: rusty
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUES: ${{ steps.context.outputs.ISSUES }}
         run: |
-          PAYLOAD=$(jq -n \
-            --arg issues "$ISSUES" \
-            '{
-              "messages": [{"role": "user", "content": ("You are Rusty, a concise engineering assistant. Based only on these public open issues, write:\n1. A short daily message (1-2 sentences, practical and direct)\n2. Up to 3 priorities for today\n\nOpen Issues: " + $issues + "\n\nDo not invent work when there are no issues. Respond in JSON only: {\"message\": \"...\", \"priorities\": [\"...\", \"...\", \"...\"]}")}],
-              "model": "gpt-4o"
-            }')
-
-          RESPONSE=$(curl --fail-with-body --silent --show-error https://models.inference.ai.azure.com/chat/completions \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD")
-
-          CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content' | sed 's/```json//g; s/```//g' | jq -c '.')
-          echo "CONTENT<<EOF" >> $GITHUB_OUTPUT
-          echo "$CONTENT" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          CONTENT=$(jq -c '
+            if length == 0 then
+              {message: "The queue is clear. Protect your focus and ship the next concrete thing.", priorities: []}
+            else
+              {message: "Keep the scope tight: finish the highest-impact open work before starting more.", priorities: [.[0:3][].title]}
+            end
+          ' <<< "$ISSUES")
+          echo "CONTENT<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$CONTENT" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Push to TRMNL
         env:
