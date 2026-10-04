@@ -2,6 +2,8 @@
 
 ![Preview](preview.png)
 
+![On a real TRMNL](preview.jpg)
+
 Push anything from your Muse to your TRMNL e-ink display. A title, a message, and an optional image — no server, no schedule, just your agent talking to your wall.
 
 ## How it works
