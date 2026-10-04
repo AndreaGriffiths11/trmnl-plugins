@@ -1,0 +1,25 @@
+<div style="font-family: sans-serif; padding: 40px; background: #fff; color: #000; height: 480px; width: 800px; position: relative; overflow: hidden; box-sizing: border-box;">
+
+  <div style="display: flex; align-items: center; justify-content: center; height: 100%; gap: 48px;">
+
+    {% if image_url and image_url != "" %}
+    <div style="flex-shrink: 0;">
+      <img src="{{ image_url }}" style="width: 220px; height: 220px; object-fit: cover; border-radius: 12px;" />
+    </div>
+    {% endif %}
+
+    <div style="max-width: 480px;">
+      <div style="font-size: 42px; font-weight: 800; margin-bottom: 18px; line-height: 1.15;">
+        {{ title }}
+      </div>
+      <div style="font-size: 20px; line-height: 1.5; color: #333;">
+        {{ body }}
+      </div>
+    </div>
+
+  </div>
+
+  <div style="position: absolute; bottom: 16px; right: 24px; font-size: 12px; color: #999;">
+    via your Muse
+  </div>
+</div>
