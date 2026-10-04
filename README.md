@@ -7,7 +7,7 @@ A collection of community plugins for [TRMNL](https://usetrmnl.com) e-ink displa
 | Plugin | Description |
 |--------|-------------|
 | [**GitHub Stars ⭐**](github-stars/) | Top 5 most starred repos on GitHub |
-| [**Agent Says 🤖**](agent-says/) | Daily AI agent quotes + priorities |
+| [**Agent Says 🤖**](agent-says/) | Approved agent messages + priorities |
 | [**Muse Hello 👋**](muse-hello/) | Push anything from your Muse to TRMNL, with optional image |
 
 ## How it works

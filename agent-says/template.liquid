@@ -10,13 +10,13 @@
     <!-- Left: Agent message -->
     <div style="flex: 1; display: flex; flex-direction: column;">
       <div style="font-size: 22px; font-weight: 800; margin-bottom: 16px; border-bottom: 3px solid #000; padding-bottom: 10px;">
-        🤖 {{ agent_name | default: "Agent" }} Says
+        🤖 {{ agent_name | default: "Agent" | escape }} Says
       </div>
       <div style="font-size: 15px; line-height: 1.5; flex: 1; padding-right: 8px;">
-        "{{ message }}"
+        "{{ message | escape }}"
       </div>
       <div style="font-size: 11px; color: #888; margin-top: 12px;">
-        {{ signature | default: agent_name }} · {{ date }}
+        {{ signature | default: agent_name | escape }} · {{ date | escape }}
       </div>
     </div>
 
@@ -31,7 +31,7 @@
         {% if [p_key] and [p_key] != "" %}
         <div style="display: flex; align-items: flex-start; margin-bottom: 14px;">
           <div style="font-size: 24px; font-weight: 800; min-width: 32px; color: #bbb;">{{ i }}</div>
-          <div style="font-size: 13px; line-height: 1.4; padding-top: 4px;">{{ [p_key] }}</div>
+          <div style="font-size: 13px; line-height: 1.4; padding-top: 4px;">{{ [p_key] | escape }}</div>
         </div>
         {% endif %}
       {% endfor %}

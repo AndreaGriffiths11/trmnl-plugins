@@ -1,70 +1,81 @@
-name: Agent Says — Daily Push
+name: Agent Says — Rusty Push
 
 on:
   repository_dispatch:
     types: [rusty_agent_says]
 
+permissions: {}
+
 jobs:
   push-agent-says:
     runs-on: ubuntu-latest
-    permissions:
-      issues: read
-      contents: read
     steps:
-      - name: Fetch open issues
-        id: context
+      - name: Validate approved message and push to TRMNL
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          ISSUES=$(gh api /repos/${{ github.repository }}/issues --jq '[.[:5] | .[] | {title: .title, number: .number}]' 2>/dev/null || echo "[]")
-          echo "ISSUES<<EOF" >> $GITHUB_OUTPUT
-          echo "$ISSUES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Compose Rusty's message
-        id: rusty
-        env:
-          ISSUES: ${{ steps.context.outputs.ISSUES }}
-        run: |
-          CONTENT=$(jq -c '
-            if length == 0 then
-              {message: "The queue is clear. Protect your focus and ship the next concrete thing.", priorities: []}
-            else
-              {message: "Keep the scope tight: finish the highest-impact open work before starting more.", priorities: [.[0:3][].title]}
-            end
-          ' <<< "$ISSUES")
-          echo "CONTENT<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$CONTENT" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-
-      - name: Push to TRMNL
-        env:
-          CONTENT: ${{ steps.rusty.outputs.CONTENT }}
           TRMNL_WEBHOOK_URL: ${{ secrets.TRMNL_WEBHOOK_URL }}
+        shell: python
         run: |
-          MESSAGE=$(echo "$CONTENT" | jq -r '.message')
-          P1=$(echo "$CONTENT" | jq -r '.priorities[0] // empty')
-          P2=$(echo "$CONTENT" | jq -r '.priorities[1] // empty')
-          P3=$(echo "$CONTENT" | jq -r '.priorities[2] // empty')
-          DATE=$(date -u '+%b %d, %Y')
+          import datetime
+          import http.client
+          import json
+          import os
+          import re
+          import sys
+          import urllib.parse
 
-          PAYLOAD=$(jq -n \
-            --arg msg "$MESSAGE" \
-            --arg date "$DATE" \
-            --arg p1 "$P1" \
-            --arg p2 "$P2" \
-            --arg p3 "$P3" \
-            '{merge_variables: {
-              agent_name: "Rusty",
-              message: $msg,
-              signature: "— Rusty 🦀",
-              date: $date,
-              priority_1: $p1,
-              priority_2: $p2,
-              priority_3: $p3
-            }}')
+          def compose(event):
+              data = event.get("client_payload")
+              if not isinstance(data, dict) or set(data) - {"message", "priorities"}:
+                  raise ValueError("Expected message and optional priorities only")
+              message = data.get("message")
+              priorities = data.get("priorities", [])
+              def text(value, limit):
+                  return (isinstance(value, str) and 0 < len(value) <= limit
+                          and bool(value.strip())
+                          and not re.search(r"[\x00-\x1f\x7f]", value))
+              if not text(message, 800):
+                  raise ValueError("Message must be 1-800 characters without control characters")
+              if (not isinstance(priorities, list) or len(priorities) > 5
+                      or not all(text(item, 100) for item in priorities)):
+                  raise ValueError("Priorities must contain at most five 1-100 character strings")
+              fields = {
+                  "agent_name": "Rusty", "message": message,
+                  "signature": "— Rusty 🦀",
+                  "date": datetime.datetime.now(datetime.timezone.utc).strftime("%b %d, %Y"),
+                  **{f"priority_{i + 1}": priorities[i] if i < len(priorities) else ""
+                     for i in range(5)},
+              }
+              payload = json.dumps({"merge_variables": fields}, ensure_ascii=False).encode("utf-8")
+              if len(payload) > 2000:
+                  raise ValueError("Rendered JSON exceeds 2000 bytes")
+              return payload
 
-          curl --fail --silent --show-error --output /dev/null -X POST "$TRMNL_WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD"
-          echo "TRMNL accepted the update."
+          def main():
+              with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as source:
+                  payload = compose(json.load(source))
+              url = urllib.parse.urlsplit(os.environ.get("TRMNL_WEBHOOK_URL", ""))
+              if (url.scheme != "https" or url.netloc not in {"trmnl.com", "usetrmnl.com"}
+                      or url.query or url.fragment
+                      or not re.fullmatch(r"/api/custom_plugins/[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", url.path)):
+                  raise ValueError("TRMNL_WEBHOOK_URL must reference the verified TRMNL private plugin")
+              # ponytail: one request, no redirects or retries that could duplicate a publish.
+              connection = http.client.HTTPSConnection(url.netloc, timeout=30)
+              try:
+                  connection.request("POST", url.path, body=payload,
+                                     headers={"Content-Type": "application/json"})
+                  status = connection.getresponse().status
+                  if not 200 <= status < 300:
+                      print(f"TRMNL rejected the update (HTTP {status})", file=sys.stderr)
+                      raise ValueError("Delivery rejected")
+                  print(f"TRMNL accepted the update (HTTP {status}); device refresh not verified.")
+              finally:
+                  connection.close()
+
+          if __name__ == "__main__":
+              try:
+                  main()
+              except Exception:
+                  # Do not print exception details, webhook URLs, response bodies, or message text.
+                  print("Publish failed: invalid input, missing/invalid endpoint, or TRMNL delivery failure.",
+                        file=sys.stderr)
+                  sys.exit(1)
